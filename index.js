@@ -37,6 +37,18 @@ async function run() {
      res.send(result);
     // console.log(result)
     })
+
+    {/*6 latest room */}
+    app.get("/latest-rooms", async (req, res) => {
+  const result = await roomsCollections
+    .find({})
+    .sort({ _id: -1 })
+    .limit(6)
+    .toArray();
+
+  res.send(result);
+});
+
    {/*Single route */}
    app.get("/rooms/:roomId", async(req,res)=>{
     const {roomId} = req.params
