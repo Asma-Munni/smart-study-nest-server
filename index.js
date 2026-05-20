@@ -2,6 +2,7 @@ const dns = require("node:dns");
 dns.setServers(["8.8.8.8", "8.8.4.4"]);
 
 const express = require('express')
+const cors = require("cors");
 const dotenv = require('dotenv')
 const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 dotenv.config()
@@ -13,6 +14,7 @@ const uri = process.env.MONGODB_URI;
  
 
 const app = express()
+app.use(cors());
 app.use(express.json());
 const PORT = process.env.PORT
 
@@ -87,15 +89,47 @@ async function run() {
 
    
    {/*delete */}
-   app.delete('/rooms/:roomId', async (req,res)=>{
-        const {roomId} = req.params;
-        console.log(roomId); 
-      
-        const query = {_id: new ObjectId(roomId) };
-        const result = await roomsCollections.deleteOne(query);
-        res.send(result);
-      
+  app.delete("/rooms/:roomId", async (req, res) => {
+  try {
+    const { roomId } = req.params;
+    const { userId } = req.query;
+
+    if (!ObjectId.isValid(roomId)) {
+      return res.status(400).send({
+        message: "Invalid room id",
       });
+    }
+
+    const room = await roomsCollections.findOne({
+      _id: new ObjectId(roomId),
+    });
+
+    if (!room) {
+      return res.status(404).send({
+        message: "Room not found",
+      });
+    }
+
+    if (room.ownerId !== userId) {
+      return res.status(403).send({
+        message: "You are not allowed to delete this room",
+      });
+    }
+
+    const result = await roomsCollections.deleteOne({
+      _id: new ObjectId(roomId),
+    });
+
+    res.send(result);
+  } catch (error) {
+    console.log(error);
+
+    res.status(500).send({
+      message: "Failed to delete room",
+      error: error.message,
+    });
+  }
+});
 
       {/*Booking route */}
       app.post("/bookings", async (req, res) => {
@@ -198,6 +232,28 @@ async function run() {
 
     res.status(500).send({
       message: "Failed to book room",
+    });
+  }
+});
+
+
+{/*Add Listing */}
+app.get("/my-listings/:userId", async (req, res) => {
+  try {
+    const { userId } = req.params;
+
+    const result = await roomsCollections
+      .find({ ownerId: userId })
+      .sort({ createdAt: -1 })
+      .toArray();
+
+    res.send(result);
+  } catch (error) {
+    console.log(error);
+
+    res.status(500).send({
+      message: "Failed to load my listings",
+      error: error.message,
     });
   }
 });
