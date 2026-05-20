@@ -30,6 +30,7 @@ async function run() {
 
     const db = client.db("smart-study");
     const roomsCollections = db.collection("rooms");
+    const bookingsCollections = db.collection("bookings");
 
     app.get("/rooms", async(req, res)=>{
      const cursor = roomsCollections.find();
@@ -95,6 +96,111 @@ async function run() {
         res.send(result);
       
       });
+
+      {/*Booking route */}
+      app.post("/bookings", async (req, res) => {
+  try {
+    const booking = req.body;
+
+    const {
+      roomId,
+      roomName,
+      roomImage,
+      userId,
+      userName,
+      userEmail,
+      bookingDate,
+      startTime,
+      endTime,
+      totalCost,
+      specialNote,
+    } = booking;
+
+    if (!roomId || !userId || !bookingDate || !startTime || !endTime) {
+      return res.status(400).send({
+        message: "Room, user, date, start time and end time are required",
+      });
+    }
+
+    const room = await roomsCollections.findOne({
+      _id: new ObjectId(roomId),
+    });
+
+    if (!room) {
+      return res.status(404).send({
+        message: "Room not found",
+      });
+    }
+
+    const today = new Date().toISOString().split("T")[0];
+
+    if (bookingDate < today) {
+      return res.status(400).send({
+        message: "Booking date must be today or a future date",
+      });
+    }
+
+    const startHour = Number(startTime.split(":")[0]);
+    const endHour = Number(endTime.split(":")[0]);
+
+    if (endHour <= startHour) {
+      return res.status(400).send({
+        message: "End time must be after start time",
+      });
+    }
+
+    const conflict = await bookingsCollections.findOne({
+      roomId: roomId,
+      bookingDate: bookingDate,
+      status: "confirmed",
+      startTime: { $lt: endTime },
+      endTime: { $gt: startTime },
+    });
+
+    if (conflict) {
+      return res.status(409).send({
+        message: "This room is already booked for the selected time slot.",
+      });
+    }
+
+    const calculatedCost = (endHour - startHour) * Number(room.hourlyRate);
+
+    const newBooking = {
+      roomId,
+      roomName: roomName || room.roomName,
+      roomImage: roomImage || room.image,
+      userId,
+      userName,
+      userEmail,
+      bookingDate,
+      startTime,
+      endTime,
+      totalCost: calculatedCost || Number(totalCost),
+      specialNote: specialNote || "",
+      status: "confirmed",
+      createdAt: new Date().toISOString(),
+    };
+
+    const result = await bookingsCollections.insertOne(newBooking);
+
+    await roomsCollections.updateOne(
+      { _id: new ObjectId(roomId) },
+      {
+        $inc: {
+          bookingCount: 1,
+        },
+      }
+    );
+
+    res.send(result);
+  } catch (error) {
+    console.log(error);
+
+    res.status(500).send({
+      message: "Failed to book room",
+    });
+  }
+});
 
 
     // Send a ping to confirm a successful connection
