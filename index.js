@@ -5,6 +5,7 @@ const express = require('express')
 const cors = require("cors");
 const dotenv = require('dotenv')
 const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
+const { createRemoteJWKSet, jwtVerify } = require("jose-cjs");
 dotenv.config()
 
 
@@ -25,6 +26,52 @@ const client = new MongoClient(uri, {
     deprecationErrors: true,
   }
 });
+
+const JWKS = createRemoteJWKSet(
+  new URL("http://localhost:3000/api/auth/jwks")
+);
+
+const verifyToken = async (req, res, next) => {
+  const authHeader = req.headers.authorization;
+
+  if (!authHeader) {
+    return res.status(401).json({
+      message: "Unauthorized: Authorization header missing",
+    });
+  }
+
+  const token = authHeader.split(" ")[1];
+  console.log(token, "Token")
+  if (!token) {
+    return res.status(401).json({
+      message: "Unauthorized: Token missing",
+    });
+  }
+ const { payload } = await jwtVerify(token, JWKS, {
+      issuer: "http://localhost:3000",
+      audience: "http://localhost:3000",
+    });
+
+    console.log("JWT Payload:", payload);
+  try {
+   
+
+    req.user = {
+      id: payload.sub || payload.id,
+      email: payload.email,
+      name: payload.name,
+    };
+
+    next();
+  } catch (error) {
+    console.log("JWT verify error:", error.message);
+
+    return res.status(401).json({
+      message: "Forbidden: Invalid token",
+    });
+  }
+};
+ 
 async function run() {
   try {
     // Connect to the client to the server	(optional starting in v4.7)
@@ -63,7 +110,7 @@ async function run() {
    })
 
    {/*data create */}
-   app.post("/rooms", async(req,res)=>{
+   app.post("/rooms",verifyToken, async(req,res)=>{
     const newRoom = req.body;
     const result = await roomsCollections.insertOne(newRoom);
     console.log(result);
@@ -132,7 +179,7 @@ async function run() {
 });
 
       {/*Booking route */}
-      app.post("/bookings", async (req, res) => {
+      app.post("/bookings",verifyToken, async (req, res) => {
   try {
     const booking = req.body;
 
