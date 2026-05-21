@@ -258,6 +258,95 @@ app.get("/my-listings/:userId", async (req, res) => {
   }
 });
 
+{/*My Booking Route */}
+app.get("/my-bookings/:userId", async (req, res) => {
+  try {
+    const { userId } = req.params;
+
+    const result = await bookingsCollections
+      .find({ userId })
+      .sort({ createdAt: -1 })
+      .toArray();
+
+    res.send(result);
+  } catch (error) {
+    console.log(error);
+
+    res.status(500).send({
+      message: "Failed to load my bookings",
+      error: error.message,
+    });
+  }
+});
+
+
+{/*Cancel Booking */}
+app.patch("/bookings/:bookingId/cancel", async (req, res) => {
+  try {
+    const { bookingId } = req.params;
+    const { userId } = req.body;
+
+    if (!ObjectId.isValid(bookingId)) {
+      return res.status(400).send({
+        message: "Invalid booking id",
+      });
+    }
+
+    const booking = await bookingsCollections.findOne({
+      _id: new ObjectId(bookingId),
+    });
+
+    if (!booking) {
+      return res.status(404).send({
+        message: "Booking not found",
+      });
+    }
+
+    if (booking.userId !== userId) {
+      return res.status(403).send({
+        message: "You are not allowed to cancel this booking",
+      });
+    }
+
+    if (booking.status === "cancelled") {
+      return res.status(400).send({
+        message: "This booking is already cancelled",
+      });
+    }
+
+    const result = await bookingsCollections.updateOne(
+      { _id: new ObjectId(bookingId) },
+      {
+        $set: {
+          status: "cancelled",
+          cancelledAt: new Date().toISOString(),
+        },
+      }
+    );
+
+    // Optional: reduce booking count after cancellation
+    if (booking.roomId && ObjectId.isValid(booking.roomId)) {
+      await roomsCollections.updateOne(
+        { _id: new ObjectId(booking.roomId) },
+        {
+          $inc: {
+            bookingCount: -1,
+          },
+        }
+      );
+    }
+
+    res.send(result);
+  } catch (error) {
+    console.log(error);
+
+    res.status(500).send({
+      message: "Failed to cancel booking",
+      error: error.message,
+    });
+  }
+});
+
 
     // Send a ping to confirm a successful connection
     await client.db("admin").command({ ping: 1 });
