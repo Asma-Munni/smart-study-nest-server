@@ -118,7 +118,7 @@ async function run() {
    })
 
    {/*Update */}
-   app.patch('/rooms/:roomId', async (req,res)=>{
+   app.patch('/rooms/:roomId',verifyToken, async (req,res)=>{
         const {roomId} = req.params;
         const updatedRoom = req.body;
      // console.log(roomId, updatedRoom);
@@ -328,7 +328,7 @@ app.get("/my-bookings/:userId", async (req, res) => {
 
 
 {/*Cancel Booking */}
-app.patch("/bookings/:bookingId/cancel", async (req, res) => {
+app.patch("/bookings/:bookingId/cancel",verifyToken, async (req, res) => {
   try {
     const { bookingId } = req.params;
     const { userId } = req.body;
