@@ -82,12 +82,31 @@ async function run() {
     const roomsCollections = db.collection("rooms");
     const bookingsCollections = db.collection("bookings");
 
-    app.get("/rooms", async(req, res)=>{
-     const cursor = roomsCollections.find();
-     const result =  await cursor.toArray();
-     res.send(result);
-    // console.log(result)
-    })
+   app.get("/rooms", async (req, res) => {
+  try {
+    const search = req.query.search || "";
+
+    const query = search
+      ? {
+          roomName: {
+            $regex: search,
+            $options: "i",
+          },
+        }
+      : {};
+
+    const result = await roomsCollections.find(query).toArray();
+
+    res.send(result);
+  } catch (error) {
+    console.log("Rooms search error:", error.message);
+
+    res.status(500).send({
+      message: "Failed to load rooms",
+      error: error.message,
+    });
+  }
+});
 
     {/*6 latest room */}
     app.get("/latest-rooms", async (req, res) => {
