@@ -28,7 +28,7 @@ const client = new MongoClient(uri, {
 });
 
 const JWKS = createRemoteJWKSet(
-  new URL("http://localhost:3000/api/auth/jwks")
+  new URL(`${process.env.CLIENT_URL}/api/auth/jwks`)
 );
 
 const verifyToken = async (req, res, next) => {
@@ -41,20 +41,20 @@ const verifyToken = async (req, res, next) => {
   }
 
   const token = authHeader.split(" ")[1];
-  console.log(token, "Token")
+
   if (!token) {
     return res.status(401).json({
       message: "Unauthorized: Token missing",
     });
   }
- const { payload } = await jwtVerify(token, JWKS, {
-      issuer: "http://localhost:3000",
-      audience: "http://localhost:3000",
+
+  try {
+    const { payload } = await jwtVerify(token, JWKS, {
+      issuer: process.env.CLIENT_URL,
+      audience: process.env.CLIENT_URL,
     });
 
     console.log("JWT Payload:", payload);
-  try {
-   
 
     req.user = {
       id: payload.sub || payload.id,
@@ -68,6 +68,7 @@ const verifyToken = async (req, res, next) => {
 
     return res.status(401).json({
       message: "Forbidden: Invalid token",
+      error: error.message,
     });
   }
 };
@@ -75,7 +76,7 @@ const verifyToken = async (req, res, next) => {
 async function run() {
   try {
     // Connect to the client to the server	(optional starting in v4.7)
-    await client.connect();
+   // await client.connect();
 
     const db = client.db("smart-study");
     const roomsCollections = db.collection("rooms");
@@ -396,7 +397,7 @@ app.patch("/bookings/:bookingId/cancel",verifyToken, async (req, res) => {
 
 
     // Send a ping to confirm a successful connection
-    await client.db("admin").command({ ping: 1 });
+   // await client.db("admin").command({ ping: 1 });
     console.log("Pinged your deployment. You successfully connected to MongoDB!");
   } finally {
     // Ensures that the client will close when you finish/error
